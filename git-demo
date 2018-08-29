@@ -1,0 +1,72 @@
+#!/usr/bin/env python
+
+import subprocess 
+from pathlib import Path
+
+class gitClassPull:
+	def __init__(self, remotebranch, localbranch):
+		self.remotebranch = remotebranch
+		self.localbranch = localbranch
+	def rename_local_untracked(self):
+		'''
+		This function is called when merge attempt exit status = 128, meaning there 
+		is a local untracked file that will be overwritten by merge (i.e. there is a
+		in the remote by the same name.)
+
+		This function retrieves the name of the local untracked file and renamed it, 
+		appending _local_untracked to the filename.
+		'''
+		diff_object = subprocess.Popen(['git', 'diff', '--name-only', '--diff-filter=A', '...origin'], stdout=subprocess.PIPE)
+		diff_output = diff_object.communicate()[0].decode('utf-8').split('\n')
+
+		for line in diff_output:
+			if Path(line).is_file():
+				Path(line).rename(Path(line + '_local_untracked'))
+
+		self.conduct_pull()
+
+
+	def revert_deleted(self):
+		'''
+		Reverts any deleted files to last version published in remote.
+		Gives student ability to recieve fresh copy of a file just by deleting it.
+		'''
+		output = subprocess.check_output(['git','log', self.remotebranch + '..' + self.localbranch, '--name-status']).decode()
+		print(output)
+
+	#def find_oldname(self):
+
+	def conduct_pull(self):
+		''' 
+		Attempts to pull remote into current branch. 
+		Auto-merges if possible, otherwise returns list of 
+		files that encountered merge conflicts.
+		'''
+		#self.revert_deleted()
+		
+		#attempt merge, record exist status
+		merge_exitstatus = subprocess.call(['git','merge'])
+		
+		if merge_exitstatus == 0:	#successful auto-merge!
+			print ("Auto-merge was successful! Your local repo is now up to date.")
+		
+		#if we run into a samename local untracked error
+		if merge_exitstatus == 128:
+			self.rename_local_untracked()
+
+		#if merge_exitstatus == 1:
+		#conflicted_files = check_output(['git','diff', '--name-only', '--diff-filter=U']).decode()
+		
+		return 0
+		
+
+
+def main():
+	#fetches using remote.<repository>.fetch values as reference specs
+	subprocess.call(['git','fetch'])
+
+	gitClassPull('origin/master', 'master').conduct_pull()
+
+
+if __name__ == '__main__':
+	main()
